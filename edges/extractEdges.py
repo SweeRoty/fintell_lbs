@@ -197,7 +197,7 @@ if __name__ == '__main__':
 		records = records.join(uids, on=['uid'], how='inner')
 	invalid_devices = getInvalidDevices(spark, month_end, args.os)
 	records = records.join(invalid_devices, on=['device_id'], how='left_outer').where(F.isnull(F.col('flag')))
-	
+
 	key = 'app_package' if args.agent == 'app' else 'device_id'
 	edges = records.rdd \
 					.map(lambda row: (row['{0}'.format(key)], (row['itime'], row['geo_code']))) \
