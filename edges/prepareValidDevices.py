@@ -36,8 +36,6 @@ def getLBSRecords(spark, fr, to, os, agent):
 			data_date between '{3}' and '{4}'
 			and from_unixtime(itime, 'yyyyMMdd') between '{3}' and '{4}'
 			and (coordinate_source like '%GPS%' or coordinate_source like '%WIFI%')
-			and cast(lng as float) between 116.084 and 116.714
-			and cast(lat as float) between 39.679 and 40.199
 	""".format(col, alias, tbl, fr, to)
 	print(sql)
 	records = spark.sql(sql)

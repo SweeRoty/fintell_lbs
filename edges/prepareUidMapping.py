@@ -21,8 +21,6 @@ def getLBSUids(spark, fr, to, os):
 			data_date between '{2}' and '{3}'
 			and from_unixtime(itime, 'yyyyMMdd') between '{2}' and '{3}'
 			and (coordinate_source like '%GPS%' or coordinate_source like '%WIFI%')
-			and cast(split(coordinate, ',')[0] as float) between 116.084 and 116.714 --(121.122, 121.793), (116.208, 116.549), (115.42, 117.51)
-			and cast(split(coordinate, ',')[1] as float) between 39.679 and 40.199 --(30.872, 31.410), (39.758, 40.024), (39.44, 41.06)
 	""".format(col, tbl, fr, to)
 	print(sql)
 	uids = spark.sql(sql)
