@@ -2,18 +2,19 @@
 
 from calendar import monthrange
 from ConfigParser import RawConfigParser
+from operator import add
+import argparse
+
 from pyspark import SparkConf
 from pyspark.sql import functions as F
 from pyspark.sql import Row, SparkSession
-
-import argparse
 
 def getLBSUids(spark, fr, to, os):
 	col = 'uid' if os == 'a' else 'md5(cast(uid as string))'
 	tbl = 'ronghui_mart.rh_lbs_wifi_daily' if os == 'a' else 'ronghui_mart.user_location_log_daily_ios'
 	sql = """
 		select
-			distinct {0} uid
+			{0} uid
 		from
 			{1}
 		where
@@ -96,7 +97,7 @@ if __name__ == '__main__':
 	for t in localConf.items('spark-config'):
 		sparkConf.set(t[0], t[1])
 	spark = SparkSession.builder \
-			.appName('RLab_GEO_Project___Extract_UID_Mappings') \
+			.appName('RLab_GEO_Project___Prepare_Valid_UIDs') \
 			.config(conf=sparkConf) \
 			.enableHiveSupport() \
 			.getOrCreate()
@@ -107,20 +108,19 @@ if __name__ == '__main__':
 	parser.add_argument('--fr', type=str)
 	parser.add_argument('--to', type=str)
 	parser.add_argument('--os', choices=['a', 'i'], default='a')
+	parser.add_argument('--print_quantile', action='store_true', default=False)
+	parser.add_argument('--threshold', type=int, default=604800)
+	parser.add_argument('--save_abnormal', action='store_true', default=False)
 	args = parser.parse_args()
 	month_end = args.fr[:6]+str(monthrange(int(args.fr[:4]), int(args.fr[4:6]))[1])
 
 	print('====> Start computation')
 	uids_lbs = getLBSUids(spark, args.fr, args.to, args.os)
-
-	uids = getUids(spark, args.to, args.os)
-	if args.os == 'i':
-		uids_idfa = getUidIDFA(spark, args.to)
-		apps = getAppInfo(spark)
-		uids_idfa = uids_idfa.join(apps, on=['app_key'], how='left_outer').select(uids.columns)
-		uids = uids.union(uids_idfa)
-	uids_lbs = uids_lbs.join(uids, on='uid', how='inner')
-	invalid_devices = getInvalidDevices(spark, month_end, args.os)
-	uids_lbs = uids_lbs.join(invalid_devices, on='device_id', how='left_outer')
-	uids_lbs = uids_lbs.where(uids_lbs.flag.isNull()).drop('flag').drop('device_id')
-	uids_lbs.repartition(1).write.csv('/user/ronghui_safe/hgy/lbs/uid/uid_mapping_{0}_{1}_{2}_bj'.format(args.fr, args.to, args.os), header=True)
+	uids_lbs = uids_lbs.rdd.map(lambda row: (row['uid'], 1)).reduceByKey(add).map(lambda t: Row(uid=t[0], point_count=t[1])).toDF()
+	if args.print_quantile:
+		uids_lbs_stats = uids_lbs.approxQuantile('point_count', [0.96, 0.97, 0.98, 0.99, 1.0], 0.01)
+		for i, percentile in enumerate([0.96, 0.97, 0.98, 0.99, 1.0]):
+			print('----> Quantile for {} is {}'.format(percentile, uids_lbs_stats[i]))
+	if args.save_abnormal:
+		uids_lbs = uids_lbs.where(F.col('point_count') >= args.threshold).drop('point_count').withColumn('flag', F.lit(1))
+		uids_lbs.repartition(1).write.csv('{0}uids/invalid_uids_{1}_{2}_OS{3}_thres{4}'.format(prefix, args.fr[4:], args.to[4:], args.os, args.threshold), header=True)
