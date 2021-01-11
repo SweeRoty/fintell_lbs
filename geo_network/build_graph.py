@@ -38,8 +38,8 @@ if __name__ == '__main__':
 
 	nodes = spark.read.csv('/user/ronghui_safe/hgy/graphframe/all_geohash_20201031.txt', header=False)
 	if args.print_group_stats:
-		nodes = nodes.rdd.map(lambda row: Row(group=row['_c0'][:5], geohash=row['_c0'])).toDF()
-		node_stats = nodes.groupby('group').agg(F.count('geohash').alias('hash_count'))
+		node_stats = nodes.rdd.map(lambda row: Row(group=row['_c0'][:5], geohash=row['_c0'])).toDF()
+		node_stats = node_stats.groupby('group').agg(F.count('geohash').alias('hash_count'))
 		quantiles = node_stats.approxQuantile('hash_count', [0.999, 0.99, 0.95, 0.9, 0.75, 0.5, 0.25, 0.01], 0.001)
 		for i, percentile in enumerate([0.999, 0.99, 0.95, 0.9, 0.75, 0.5, 0.25, 0.01]):
 			print('----> Quantile for {} is {}'.format(percentile, quantiles[i]))
