@@ -111,6 +111,7 @@ if __name__ == '__main__':
 	parser.add_argument('--save_abnormal', action='store_true', default=False)
 	args = parser.parse_args()
 	month_end = args.fr[:6]+str(monthrange(int(args.fr[:4]), int(args.fr[4:6]))[1])
+	prefix = '/user/ronghui_safe/hgy/lbs/'
 
 	print('====> Start computation')
 	uids_lbs = getLBSUids(spark, args.fr, args.to, args.os)
